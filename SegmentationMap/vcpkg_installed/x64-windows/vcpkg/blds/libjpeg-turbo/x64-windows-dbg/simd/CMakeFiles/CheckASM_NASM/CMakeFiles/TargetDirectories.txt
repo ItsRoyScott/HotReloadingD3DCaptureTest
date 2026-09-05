@@ -1,2 +1,0 @@
-D:/Projects/HotReloadingD3DCapture/SegmentationMap/vcpkg_installed/x64-windows/vcpkg/blds/libjpeg-turbo/x64-windows-dbg/simd/CMakeFiles/CheckASM_NASM/CMakeFiles/edit_cache.dir
-D:/Projects/HotReloadingD3DCapture/SegmentationMap/vcpkg_installed/x64-windows/vcpkg/blds/libjpeg-turbo/x64-windows-dbg/simd/CMakeFiles/CheckASM_NASM/CMakeFiles/rebuild_cache.dir
