@@ -60,6 +60,47 @@ Flat colormaps don't provide explicit class contrast or structural vector edges.
 
 ---
 
+## AI Collaboration & Technical Overrides
+
+AI assistance was used for rapid setup, boilerplate generation, and API reference lookup[cite: 27, 28]. However, severe technical friction occurred whenever AI attempted to model DirectX 11 rendering lifecycles or Unreal Engine runtime state[cite: 26, 28]. Below are the key engineering overrides required:
+
+---
+
+### 1. GPU Readback Stalls vs. Asynchronous Staging Ring
+* **AI Assumption**: AI initially suggested executing `ID3D11DeviceContext::CopyResource` immediately followed by `ID3D11DeviceContext::Map` on a single staging texture[cite: 28].
+* **Failure Mode**: Calling `Map` on the same frame forces the CPU to block until the GPU executes all preceding commands in the pipeline, dropping game performance from 60 FPS to 10 FPS[cite: 28].
+* **Engineering Override**: Rejected the single-texture approach and designed a 3-frame staging buffer ring (`ID3D11Texture2D` pool with `D3D11_USAGE_STAGING`)[cite: 28]. Copy operations are issued on frame $N$, while readbacks occur asynchronously from frame $(N - 2)$, giving the GPU two full cycles to execute DMA transfers without stalling the render thread[cite: 28].
+
+---
+
+### 2. Dynamic Engine State & "Disappearing" CustomStencil
+* **AI Assumption**: AI assumed object identities and stencil buffer bindings were static actor properties set once at initialization[cite: 26, 28].
+* **Failure Mode**: During actor pickup events (e.g., holding the baby actor), active stencil pixel counts dropped from 9,643 down to 0, despite the actor filling the center of the viewport[cite: 26]. AI misdiagnosed this as a buffer alignment or camera clipping issue[cite: 26].
+* **Engineering Override**: Recognized that Unreal Engine mutates primitive flags when attaching actors to player socket transforms, disabling `bRenderCustomDepth` during pickup animations[cite: 26, 28]. Overrode AI by hooking `UFunction::ProcessEvent` on `AActor::Tick` to enforce `bRenderCustomDepth = true` and `CustomDepthStencilValue = 62` dynamically across all attached `UPrimitiveComponent` instances[cite: 26, 28].
+
+---
+
+### 3. Flat OpenCV Colormaps vs. Crisp Vector Overlays
+* **AI Assumption**: AI defaulted to applying flat OpenCV colormaps (`cv2.applyColorMap(COLORMAP_JET)`) directly over stencil matrices[cite: 25, 27].
+* **Failure Mode**: This produced muddy, low-contrast rainbow gradients across the screen without clear perimeter boundaries or class distinction[cite: 25, 27].
+* **Engineering Override**: Refactored the post-processing pipeline in `ValidationSuite/validate_segmentation.py`[cite: 27]. Replaced flat colormaps with explicit per-class BGR color lookup tables, contour perimeter vector tracing (`cv2.drawContours`), morphological closing filters (`cv2.MORPH_CLOSE`), and anchored text badges at the object's center of mass[cite: 25, 27].
+
+---
+
+### 4. HTML5 Web Video Encoder Compatibility
+* **AI Assumption**: AI generated standard `cv2.VideoWriter` initialization blocks using `avc1` / `mp4v` FourCC flags, asserting the output MP4 files were web-ready[cite: 27].
+* **Failure Mode**: OpenCV's raw writers output video streams in non-standard `yuv444p` formats or improper profile headers that HTML5 embedded players refuse to stream[cite: 27].
+* **Engineering Override**: Added an automated post-encoding pass via Python's `subprocess` module[cite: 27]. The script queries `shutil.which("ffmpeg")` and automatically re-encodes raw MP4 passes into web-compliant H.264 video (`yuv420p` pixel format, CRF 18)[cite: 27].
+
+---
+
+### 5. Single-File Injection vs. Modular Hot-Reloading Architecture
+* **AI Assumption**: AI continuously pushed monolithic, single-file injection DLL scripts that required restarting the game executable on every logic edit[cite: 29].
+* **Failure Mode**: Relaunching the title and re-navigating menus for every minor tweak severely degraded development velocity[cite: 29].
+* **Engineering Override**: Architected a persistent separation between the hook shim and the execution logic[cite: 29]. Built an in-house `Injector.exe` and a persistent `HookShim.dll` to hold DirectX detours in memory, while delegating frame processing to a hot-reloadable module that updates live via Visual Studio (`Ctrl+Shift+B`) without restarting the game[cite: 29].
+
+---
+
 ## Core Findings
 
 * **MinHook Detours**: Intercepting `Present` and `OMSetRenderTargets` provides reliable access to DirectX 11 swapchains without disrupting game execution.
